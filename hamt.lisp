@@ -22,30 +22,23 @@
 
 (defun get (key hamt)
   (declare #.*interface* (hamt hamt))
-  (with-slots (root-entries root-bitlen test hash) hamt
+  (let ((root-entries (hamt-root-entries hamt))
+        (root-bitlen  (hamt-root-bitlen hamt))
+        (hash         (hamt-hash hamt)))
     (declare #.*fastest*)
     (let ((in (new-arc-stream key :hash hash)))
       (declare (dynamic-extent in))
-      (do* ((node nil entry)
-            (arc (read-n-arc in root-bitlen) (read-arc in))
-            (entry (aref root-entries arc) (get-entry node arc)))
-           ((typep entry '(or null key/value))
-            (if (and entry (funcall test key (k/v-key entry)))
-                (values (k/v-value entry) t)
-              (values nil nil))))
-           
-            
-      #+C(loop WITH node = nil
+      (loop WITH node = nil
             FOR arc   = (read-n-arc in root-bitlen) THEN (read-arc in)
             FOR entry = (aref root-entries arc) THEN (get-entry node arc)
-      DO
-      (typecase entry
-        (null     (return (values nil nil)))
-        (amt-node (setf node entry))        
-        (key/value     
-         (return (if (funcall test key (k/v-key entry))  
-                     (values (k/v-value entry) t)
-                   (values nil nil)))))))))
+        DO
+        (typecase entry
+          (null     (return (values nil nil)))
+          (amt-node (setf node entry))        
+          (key/value     
+           (return (if (funcall (hamt-test hamt) key (k/v-key entry))  
+                       (values (k/v-value entry) t)
+                     (values nil nil)))))))))
 
 (defun resolve-collision (kv1 kv2 arc-start rehash-count node hamt)
   (declare #.*fastest*
