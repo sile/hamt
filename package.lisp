@@ -10,7 +10,7 @@
 (in-package :hamt)
 
 (defvar *fastest* '(optimize (speed 3) (safety 0) (debug 0)))
-(defvar *interface '(optimize (speed 3) (safety 1) (debug 1)))
+(defvar *interface* '(optimize (speed 3) (safety 1) (debug 1)))
 
 (defconstant +FIXNUM-LENGTH+ (integer-length most-positive-fixnum))
 (defconstant +PER-ARC-BIT-LENGTH+ 5)

@@ -21,11 +21,21 @@
                :test test :hash hash)))
 
 (defun get (key hamt)
-  (declare #.*fastest* (hamt hamt))
+  (declare #.*interface* (hamt hamt))
   (with-slots (root-entries root-bitlen test hash) hamt
+    (declare #.*fastest*)
     (let ((in (new-arc-stream key :hash hash)))
       (declare (dynamic-extent in))
-      (loop WITH node = nil
+      (do* ((node nil entry)
+            (arc (read-n-arc in root-bitlen) (read-arc in))
+            (entry (aref root-entries arc) (get-entry node arc)))
+           ((typep entry '(or null key/value))
+            (if (and entry (funcall test key (k/v-key entry)))
+                (values (k/v-value entry) t)
+              (values nil nil))))
+           
+            
+      #+C(loop WITH node = nil
             FOR arc   = (read-n-arc in root-bitlen) THEN (read-arc in)
             FOR entry = (aref root-entries arc) THEN (get-entry node arc)
       DO
@@ -64,9 +74,9 @@
 
 
 (defun set-impl (key value hamt)
-  (declare #.*fastest*
-           (hamt hamt))
+  (declare #.*interface* (hamt hamt))
   (with-slots (root-entries root-bitlen test hash) hamt
+    (declare #.*fastest*)
     (let ((in (new-arc-stream key :hash hash)))
       (declare (dynamic-extent in))
       (loop WITH node = nil
