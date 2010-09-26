@@ -1,6 +1,6 @@
 (in-package :hamt)
 
-(declaim (inline make-arc-stream new-arc-stream read-arc))
+(declaim (inline make-arc-stream new-arc-stream read-arc read-n-arc))
 
 (defstruct arc-stream
   (hash #'sxhash  :type function :read-only t)
@@ -27,3 +27,13 @@
             start 0))
     (prog1 (ldb (byte +PER-ARC-BIT-LENGTH+ start) hash-code)
       (incf start +PER-ARC-BIT-LENGTH+))))
+
+(defun read-n-arc (arc-stream bit-length)
+  (declare (arc-stream arc-stream)
+           (bitmap-length bit-length))
+  (with-slots (hash key hash-code start rehash-count) arc-stream
+    (when (>= start +FIXNUM-LENGTH+)
+      (setf hash-code (funcall hash (cons key (incf rehash-count)))
+            start 0))
+    (prog1 (ldb (byte bit-length start) hash-code)
+      (incf start bit-length))))

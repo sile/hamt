@@ -5,6 +5,7 @@
            make
            get
            remove
+           map
            mapc))
 (in-package :hamt)
 

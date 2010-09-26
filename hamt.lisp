@@ -8,33 +8,36 @@
   value)
 
 (defstruct hamt
-  (root (make-amt-node) :type amt-node)
-  (test #'equal         :type function)       
-  (hash #'sxhash        :type function))
+  (root-entries #() :type simple-vector)
+  (root-bitlen 0    :type fixnum-length)
+  (test #'equal     :type function)       
+  (hash #'sxhash    :type function))
 
-(defun make (&key (test #'equal) (hash #'sxhash))
+(defun make (&key (test #'equal) (hash #'sxhash) (root-size 32))
   (declare (function test hash))
-  (make-hamt :test test :hash hash))
+  (let ((bit-length (ceiling (log root-size 2))))
+    (make-hamt :root-entries (make-array (round (expt 2 bit-length)) :initial-element nil)
+               :root-bitlen bit-length
+               :test test :hash hash)))
 
 (defun get (key hamt)
-  (declare #.*fastest*
-           (hamt hamt))
-  (with-slots (root test hash) hamt
+  (declare #.*fastest* (hamt hamt))
+  (with-slots (root-entries root-bitlen test hash) hamt
     (let ((in (new-arc-stream key :hash hash)))
       (declare (dynamic-extent in))
-      (loop WITH node = root
-            FOR arc   = (read-arc in)
-            FOR entry = (get-entry node arc)
+      (loop WITH node = nil
+            FOR arc   = (read-n-arc in root-bitlen) THEN (read-arc in)
+            FOR entry = (aref root-entries arc) THEN (get-entry node arc)
       DO
       (typecase entry
         (null     (return (values nil nil)))
         (amt-node (setf node entry))        
-        (key/value                          
+        (key/value     
          (return (if (funcall test key (k/v-key entry))  
                      (values (k/v-value entry) t)
                    (values nil nil)))))))))
 
-(defun resolve-collision (kv1 kv2 arc-start rehash-count node arc hamt)
+(defun resolve-collision (kv1 kv2 arc-start rehash-count node hamt)
   (declare #.*fastest*
            (key/value kv1 kv2)
            (arc-start arc-start)
@@ -49,7 +52,6 @@
                                            :start arc-start 
                                            :rehash-count rehash-count)))
           (declare (dynamic-extent in1 in2))
-          (setf node (set-entry node arc (make-amt-node)))
           (loop FOR a1 = (read-arc in1)
                 FOR a2 = (read-arc in2)
                 WHILE (= a1 a2) 
@@ -64,22 +66,26 @@
 (defun set-impl (key value hamt)
   (declare #.*fastest*
            (hamt hamt))
-  (with-slots (root test hash) hamt
+  (with-slots (root-entries root-bitlen test hash) hamt
     (let ((in (new-arc-stream key :hash hash)))
       (declare (dynamic-extent in))
-      (loop WITH node = root
-            FOR arc = (read-arc in)
-            FOR entry = (get-entry node arc)
+      (loop WITH node = nil
+            FOR arc   = (read-n-arc in root-bitlen) THEN (read-arc in)
+            FOR entry = (aref root-entries arc) THEN (get-entry node arc)
         DO
         (typecase entry
-          (null      (return (set-entry node arc (make-key/value key value)))) 
+          (null      (return (if node
+                                 (set-entry node arc (make-key/value key value))
+                               (setf (aref root-entries arc) (make-key/value key value)))))
           (amt-node  (setf node entry))
           (key/value 
            (return (if (funcall test key (k/v-key entry))
                        (setf (k/v-value entry) value)
                      (resolve-collision (make-key/value key value) entry
                                         (arc-stream-start in) (arc-stream-rehash-count in)
-                                        node arc
+                                        (if node 
+                                            (set-entry node arc (make-amt-node))
+                                          (setf (aref root-entries arc) (make-amt-node)))
                                         hamt)))))))))
 
 (defsetf get (key hamt) (new-value)

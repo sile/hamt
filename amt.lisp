@@ -1,6 +1,6 @@
 (in-package :hamt)
 
-(declaim (inline ctpop valid-entry-p get-entry))
+(declaim (inline ctpop valid-entry-p get-entry make-amt-node))
 
 (defun ctpop (bitmap &key (start 0) (end +BITMAP-SIZE+))
   (declare (bitmap bitmap)
