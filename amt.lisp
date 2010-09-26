@@ -1,6 +1,6 @@
 (in-package :hamt)
 
-(declaim (inline ctpop valid-entry-p))
+(declaim (inline ctpop valid-entry-p get-entry))
 
 (defun ctpop (bitmap &key (start 0) (end +BITMAP-SIZE+))
   (declare (bitmap bitmap)
@@ -25,7 +25,8 @@
       (aref entries (ctpop bitmap :end arc)))))
 
 (defun set-entry (node arc new-entry)
-  (declare (amt-node node)
+  (declare #.*fastest*
+           (amt-node node)
            (arc arc))
   (with-slots (bitmap entries) node
     (let ((new-entry-index (ctpop bitmap :end arc)))

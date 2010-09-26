@@ -1,3 +1,9 @@
+[version]
+- 0.0.1
+
+[説明]
+- http://d.hatena.ne.jp/sile/20100926/1285467529 での実装を整理したもの 
+
 [参照]
 - Bagwell, P. (2001) Ideal Hash Trees. Technical Report, 2001
 　-- http://lampwww.epfl.ch/papers/idealhashtrees.pdf
