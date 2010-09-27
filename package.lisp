@@ -3,6 +3,7 @@
   (:shadow :common-lisp get remove mapc)
   (:export hamt
            make
+           entry-count
            get
            remove
            map

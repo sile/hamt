@@ -1,6 +1,6 @@
 (in-package :hamt)
 
-(declaim (inline make-key/value))
+(declaim (inline make-key/value entry-count))
 
 (defstruct (key/value (:conc-name k/v-)
                       (:constructor make-key/value (key value)))
@@ -8,18 +8,25 @@
   value)
 
 (defstruct hamt
-  (root-entries #() :type simple-vector)
-  (root-bitlen 0    :type fixnum-length)
-  (test #'equal     :type function)       
-  (hash #'sxhash    :type function)
-  (rehash #'rehash  :type function))
+  (root-entries #()   :type simple-vector)
+  (root-bitlen 0      :type fixnum-length)
+  (test #'equal       :type function)       
+  (hash #'sxhash      :type function)
+  (rehash #'rehash    :type function)
+  (resize-threshold 0 :type positive-fixnum)
+  (entry-count 0      :type positive-fixnum))
 
-(defun make (&key (test #'equal) (hash #'sxhash) (rehash #'rehash) (root-size 32))
+(defun make (&key (test #'equal) (hash #'sxhash) (rehash #'rehash) (size 16))
   (declare (function test hash rehash))
-  (let ((bit-length (ceiling (log root-size 2))))
-    (make-hamt :root-entries (make-array (round (expt 2 bit-length)) :initial-element nil)
+  (let ((bit-length (ceiling (log size 2))))
+    (make-hamt :root-entries (make-array (ash 2 (1- bit-length)) :initial-element nil)
                :root-bitlen bit-length
+               :resize-threshold (ash 2 (the fixnum-length (+ -1 bit-length +PER-ARC-BIT-LENGTH+)))
                :test test :hash hash :rehash rehash)))
+
+(defun entry-count (hamt)
+  (declare #.*interface* (hamt hamt))
+  (hamt-entry-count hamt))
 
 (defun get (key hamt)
   (declare #.*interface* (hamt hamt))
@@ -67,11 +74,33 @@
             (set-entry node a1 kv1)
             (set-entry node a2 kv2)))))))
 
+(defun resize-root (hamt)
+  (declare #.*fastest* (hamt hamt))
+  (with-slots (root-entries hash rehash root-bitlen resize-threshold) hamt
+    (let* ((new-bitlen (the fixnum-length (+ root-bitlen +PER-ARC-BIT-LENGTH+)))
+           (new-root (make-array (ash 2 (1- new-bitlen)) :initial-element nil)))
+      (loop FOR e ACROSS root-entries
+            FOR base OF-TYPE positive-fixnum FROM 0 
+        DO
+        (typecase e
+          (amt-node (loop FOR arc FROM 0 BELOW +BITMAP-SIZE+
+                          FOR sub-e = (get-entry e arc)
+                          WHEN sub-e
+                      DO
+                      (setf (aref new-root (+ (the positive-fixnum (ash arc root-bitlen)) base)) sub-e)))
+          (key/value (let ((in (new-arc-stream (k/v-key e) :hash hash :rehash hash)))
+                       (declare (dynamic-extent in))
+                       (setf (aref new-root (read-n-arc in new-bitlen)) e)))))
+      (setf root-entries new-root
+            root-bitlen new-bitlen
+            resize-threshold (the positive-fixnum (ash resize-threshold +PER-ARC-BIT-LENGTH+))))))
 
 (defun set-impl (key value hamt)
   (declare #.*interface* (hamt hamt))
-  (with-slots (root-entries root-bitlen test hash rehash) hamt
+  (with-slots (root-entries root-bitlen test hash rehash entry-count resize-threshold) hamt
     (declare #.*fastest*)
+    (when (< resize-threshold entry-count)
+      (resize-root hamt))
     (let ((in (new-arc-stream key :hash hash :rehash rehash)))
       (declare (dynamic-extent in))
       (loop WITH node = nil
@@ -79,19 +108,22 @@
             FOR entry = (aref root-entries arc) THEN (get-entry node arc)
         DO
         (typecase entry
-          (null      (return (if node
-                                 (set-entry node arc (make-key/value key value))
-                               (setf (aref root-entries arc) (make-key/value key value)))))
+          (null (incf entry-count)
+                (return (if node
+                            (set-entry node arc (make-key/value key value))
+                          (setf (aref root-entries arc) (make-key/value key value)))))
           (amt-node  (setf node entry))
           (key/value 
            (return (if (funcall test key (k/v-key entry))
                        (setf (k/v-value entry) value)
-                     (resolve-collision (make-key/value key value) entry
-                                        (arc-stream-start in) (arc-stream-rehash-count in)
-                                        (if node 
-                                            (set-entry node arc (make-amt-node))
-                                          (setf (aref root-entries arc) (make-amt-node)))
-                                        hamt)))))))))
+                     (progn
+                       (incf entry-count)
+                       (resolve-collision (make-key/value key value) entry
+                                          (arc-stream-start in) (arc-stream-rehash-count in)
+                                          (if node 
+                                              (set-entry node arc (make-amt-node))
+                                            (setf (aref root-entries arc) (make-amt-node)))
+                                          hamt))))))))))
 
 (defsetf get (key hamt) (new-value)
   `(progn (set-impl ,key ,new-value ,hamt)  
