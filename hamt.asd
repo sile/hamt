@@ -9,6 +9,7 @@
   :serial t
   :components ((:file "package")
                (:file "util")
+               (:file "entries-allocator")
                (:file "arc-stream")
                (:file "amt")
                (:file "hamt")))

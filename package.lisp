@@ -7,7 +7,10 @@
            get
            remove
            map
-           mapc))
+           mapc
+
+           make-entries-pool
+           *entries-pool*))
 (in-package :hamt)
 
 (defvar *fastest* '(optimize (speed 3) (safety 0) (debug 0)))

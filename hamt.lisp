@@ -85,7 +85,9 @@
                           FOR sub-e = (get-entry e arc)
                           WHEN sub-e
                       DO
-                      (setf (aref new-root (+ (the positive-fixnum (ash arc root-bitlen)) base)) sub-e)))
+                      (setf (aref new-root (+ (the positive-fixnum (ash arc root-bitlen)) base)) sub-e))
+                    (free-entries (amt-node-entries e) *entries-pool*))
+
           (key/value (let ((in (new-arc-stream (k/v-key e) :hash hash)))
                        (declare (dynamic-extent in))
                        (setf (aref new-root (read-n-arc in new-bitlen)) e)))))
