@@ -9,3 +9,9 @@
   `(with-slots ,(mapcar (lambda (f) `(,(symb instance"."f) ,f)) fields)
                ,instance
      ,@body))
+
+(defun hash (key rehash-count)
+  (declare #.*fastest* (positive-fixnum rehash-count))
+  (if (zerop rehash-count)
+      (sxhash key)
+    (sxhash (format nil "~D~A" rehash-count key))))

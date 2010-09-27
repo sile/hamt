@@ -11,18 +11,17 @@
   (root-entries #()   :type simple-vector)
   (root-bitlen 0      :type fixnum-length)
   (test #'equal       :type function)       
-  (hash #'sxhash      :type function)
-  (rehash #'rehash    :type function)
+  (hash #'hash      :type function)
   (resize-threshold 0 :type positive-fixnum)
   (entry-count 0      :type positive-fixnum))
 
-(defun make (&key (test #'equal) (hash #'sxhash) (rehash #'rehash) (size 16))
-  (declare (function test hash rehash))
+(defun make (&key (test #'equal) (hash #'hash) (size 16))
+  (declare (function test hash))
   (let ((bit-length (ceiling (log size 2))))
     (make-hamt :root-entries (make-array (ash 2 (1- bit-length)) :initial-element nil)
                :root-bitlen bit-length
                :resize-threshold (ash 2 (the fixnum-length (+ -1 bit-length +PER-ARC-BIT-LENGTH+)))
-               :test test :hash hash :rehash rehash)))
+               :test test :hash hash)))
 
 (defun entry-count (hamt)
   (declare #.*interface* (hamt hamt))
@@ -32,10 +31,9 @@
   (declare #.*interface* (hamt hamt))
   (let ((root-entries (hamt-root-entries hamt))
         (root-bitlen  (hamt-root-bitlen hamt))
-        (hash         (hamt-hash hamt))
-        (rehash       (hamt-rehash hamt)))
+        (hash         (hamt-hash hamt)))
     (declare #.*fastest*)
-    (let ((in (new-arc-stream key :hash hash :rehash rehash)))
+    (let ((in (new-arc-stream key :hash hash)))
       (declare (dynamic-extent in))
       (loop WITH node = nil
             FOR arc   = (read-n-arc in root-bitlen) THEN (read-arc in)
@@ -54,13 +52,13 @@
            (key/value kv1 kv2)
            (arc-start arc-start)
            (positive-fixnum rehash-count))
-  (with-slots (test hash rehash) hamt
+  (with-slots (test hash) hamt
     (with-fields (key value) kv1
       (with-fields (key value) kv2
-        (let ((in1 (new-arc-stream kv1.key :hash hash :rehash rehash 
+        (let ((in1 (new-arc-stream kv1.key :hash hash
                                            :start arc-start 
                                            :rehash-count rehash-count))
-              (in2 (new-arc-stream kv2.key :hash hash :rehash rehash
+              (in2 (new-arc-stream kv2.key :hash hash
                                            :start arc-start 
                                            :rehash-count rehash-count)))
           (declare (dynamic-extent in1 in2))
@@ -76,7 +74,7 @@
 
 (defun resize-root (hamt)
   (declare #.*fastest* (hamt hamt))
-  (with-slots (root-entries hash rehash root-bitlen resize-threshold) hamt
+  (with-slots (root-entries hash root-bitlen resize-threshold) hamt
     (let* ((new-bitlen (the fixnum-length (+ root-bitlen +PER-ARC-BIT-LENGTH+)))
            (new-root (make-array (ash 2 (1- new-bitlen)) :initial-element nil)))
       (loop FOR e ACROSS root-entries
@@ -88,7 +86,7 @@
                           WHEN sub-e
                       DO
                       (setf (aref new-root (+ (the positive-fixnum (ash arc root-bitlen)) base)) sub-e)))
-          (key/value (let ((in (new-arc-stream (k/v-key e) :hash hash :rehash hash)))
+          (key/value (let ((in (new-arc-stream (k/v-key e) :hash hash)))
                        (declare (dynamic-extent in))
                        (setf (aref new-root (read-n-arc in new-bitlen)) e)))))
       (setf root-entries new-root
@@ -97,11 +95,11 @@
 
 (defun set-impl (key value hamt)
   (declare #.*interface* (hamt hamt))
-  (with-slots (root-entries root-bitlen test hash rehash entry-count resize-threshold) hamt
+  (with-slots (root-entries root-bitlen test hash entry-count resize-threshold) hamt
     (declare #.*fastest*)
     (when (< resize-threshold entry-count)
       (resize-root hamt))
-    (let ((in (new-arc-stream key :hash hash :rehash rehash)))
+    (let ((in (new-arc-stream key :hash hash)))
       (declare (dynamic-extent in))
       (loop WITH node = nil
             FOR arc   = (read-n-arc in root-bitlen) THEN (read-arc in)
