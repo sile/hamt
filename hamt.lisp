@@ -147,5 +147,5 @@
             (amortized-resize hamt)))))))
                        
 (defsetf get (key hamt) (new-value)
-  `(progn (set-impl ,key ,new-value ,hamt)  
+  `(progn (set-impl ,key ,new-value ,hamt)
           ,new-value))

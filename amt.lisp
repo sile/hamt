@@ -9,8 +9,8 @@
 
 (defstruct (key/value (:conc-name k/v-)
                       (:constructor make-key/value (key value)))
-  key
-  value)
+  (key   nil :type t :read-only t)
+  (value nil :type t))
 
 (defstruct amt-node
   (bitmap  0              :type bitmap)
