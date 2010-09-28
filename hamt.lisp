@@ -42,9 +42,9 @@
     (let ((in (new-arc-stream key :hash hash)))
       (declare (dynamic-extent in))
       (loop WITH node = nil
-            FOR arc   = (read-n-arc in root-bitlen) THEN (read-arc in)
+            FOR arc OF-TYPE positive-fixnum  = (read-n-arc in root-bitlen) THEN (read-arc in)
             FOR entry = (aref (if (< arc resize-threshold)
-                                  root-entries new-root-entries)
+                                  root-entries (progn (incf arc (the positive-fixnum (ash (read-arc in) root-bitlen))) new-root-entries))
                               arc) THEN (get-entry node arc)
         DO
         (typecase entry
@@ -113,16 +113,17 @@
     (let ((in (new-arc-stream key :hash hash)))
       (declare (dynamic-extent in))
       (loop WITH node = nil
-            FOR arc   = (read-n-arc in root-bitlen) THEN (read-arc in)
-            FOR entry = (aref #1=(if (< arc resize-threshold)
-                                  root-entries new-root-entries)
+            FOR arc OF-TYPE positive-fixnum  = (read-n-arc in root-bitlen) THEN (read-arc in)
+            FOR entry = (aref (if (< arc resize-threshold)
+                                  root-entries (progn (incf arc (the positive-fixnum (ash (read-arc in) root-bitlen))) new-root-entries))
                               arc) THEN (get-entry node arc)
         DO
         (typecase entry
           (null (incf entry-count)
                 (return (prog1 (if node
                                    (set-entry node arc (make-key/value key value))
-                                 (setf (aref #1# arc) (make-key/value key value)))
+                                 (setf (aref #1=(if (< arc resize-threshold) root-entries new-root-entries)
+                                             arc) (make-key/value key value)))
                           (decf resize-threshold)
                           (resize-one hamt))))
           (amt-node  (setf node entry))
