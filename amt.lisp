@@ -45,6 +45,20 @@
           (setf entries new-entries)))
       (setf (aref entries new-entry-index) new-entry))))
 
+(defun set-new-2-entries (node arc1 entry1 arc2 entry2)
+  (declare #.*fastest*
+           (amt-node node)
+           (arc arc1 arc2))
+  (with-slots (bitmap entries) node
+    (setf entries (alloc-entries 2)
+          (ldb (byte 1 arc1) bitmap) 1
+          (ldb (byte 1 arc2) bitmap) 1)
+    (if (< arc1 arc2)
+        (setf (aref entries 0) entry1
+              (aref entries 1) entry2)
+      (setf (aref entries 1) entry1
+            (aref entries 0) entry2))))
+
 (defsetf get-entry (node arc) (new-value)
   `(set-entry ,node ,arc ,new-value))
 

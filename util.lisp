@@ -1,5 +1,12 @@
 (in-package :hamt)
 
+(declaim (inline fixash))
+
+(defun fixash (integer count)
+  (declare (positive-fixnum integer)
+           (fixnum-length count))
+  (the positive-fixnum (ash integer count)))
+
 (defun symb (&rest args)
   (intern
    (with-output-to-string (out)

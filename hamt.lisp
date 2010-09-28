@@ -34,7 +34,7 @@
     (let ((arc (read-n-arc in root-bitlen)))
       (if (< arc resize-border)
           (values arc root-entries)
-        (let ((new-arc (the positive-fixnum (+ arc (the positive-fixnum (ash (read-arc in) root-bitlen))))))
+        (let ((new-arc (the positive-fixnum (+ arc (fixash (read-arc in) root-bitlen)))))
           (values new-arc new-root-entries))))))
 
 (defmacro find-entry-case ((entry entry-place) (in hamt) &key on-succeeded on-failed) 
@@ -94,32 +94,36 @@
           (setf node (setf (get-entry node a1) (make-amt-node)))
           
           FINALLY
-          (setf (get-entry node a1) kv1
-                (get-entry node a2) kv2))))))
+          (set-new-2-entries node a1 kv1 a2 kv2))))))
 
-;; TODO: rename
-(defun resize-one (hamt)
-  (declare (hamt hamt))
+(defun amortized-resize (hamt)
+  (declare #.*fastest*
+           (hamt hamt))
   (with-slots (root-entries hash root-bitlen new-root-entries resize-border) hamt
-    (cond ((= resize-border #1=(length root-entries))
-           (setf new-root-entries (make-array (ash #1# +PER-ARC-BIT-LENGTH+) :initial-element nil)))
-          ((< resize-border #1#)
-           (let ((e (aref root-entries resize-border))
-                 (base resize-border))
-             (typecase e
-               (amt-node (each-entry (arc sub-e) e
-                           (setf (aref new-root-entries (+ (the positive-fixnum (ash arc root-bitlen)) base)) sub-e))
-                         (free-entries (amt-node-entries e)))
-
-               (key/value (let ((in (new-arc-stream (k/v-key e) :hash hash)))
-                            (declare (dynamic-extent in))
-                            (setf (aref new-root-entries (read-n-arc in (+ root-bitlen +PER-ARC-BIT-LENGTH+))) e)))))
-           (setf (aref root-entries resize-border) nil)
-           (when (zerop resize-border)
-             (setf root-entries new-root-entries
-                   resize-border (ash (length new-root-entries) +PER-ARC-BIT-LENGTH+))
-             (incf root-bitlen +PER-ARC-BIT-LENGTH+)))
-          )))
+    (decf resize-border)
+    (let ((cur-size (length root-entries)))
+      (cond ((= resize-border cur-size)
+             (setf new-root-entries 
+                   (make-array (fixash cur-size +PER-ARC-BIT-LENGTH+) :initial-element nil)))
+            ((< resize-border cur-size)
+             (let* ((root-arc resize-border)
+                    (entry (aref root-entries root-arc))
+                    (new-root-bitlen (+ root-bitlen +PER-ARC-BIT-LENGTH+)))
+               (declare (fixnum-length new-root-bitlen))
+               (typecase entry
+                 (amt-node (each-entry (arc sub-entry) entry
+                             (let ((adjusted-arc (+ (fixash arc root-bitlen) root-arc)))
+                               (setf (aref new-root-entries adjusted-arc) sub-entry)))
+                           (free-entries (amt-node-entries entry)))
+                 (key/value (let ((in (new-arc-stream (k/v-key entry) :hash hash)))
+                              (declare (dynamic-extent in))
+                              (setf (aref new-root-entries (read-n-arc in new-root-bitlen)) entry))))
+               
+               (setf (aref root-entries resize-border) nil)
+               (when (zerop resize-border)
+                 (setf root-entries new-root-entries
+                       resize-border (fixash (length new-root-entries) +PER-ARC-BIT-LENGTH+)
+                       root-bitlen  new-root-bitlen))))))))
 
 (defun set-impl (key value hamt)
   (declare #.*interface* (hamt hamt))
@@ -130,8 +134,7 @@
       (find-entry-case (entry entry-place) (in hamt) 
         :on-failed (progn (incf entry-count)
                           (setf entry-place (make-key/value key value))
-                          (decf resize-border)
-                          (resize-one hamt))
+                          (amortized-resize hamt))
         :on-succeeded
         (if (funcall test key (k/v-key entry))
             (setf (k/v-value entry) value)
@@ -141,8 +144,7 @@
                                (arc-stream-start in) (arc-stream-rehash-count in)
                                (setf entry-place (make-amt-node))
                                hamt)
-            (decf resize-border)
-            (resize-one hamt)))))))
+            (amortized-resize hamt)))))))
                        
 (defsetf get (key hamt) (new-value)
   `(progn (set-impl ,key ,new-value ,hamt)  
