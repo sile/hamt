@@ -1,5 +1,10 @@
 [version]
-- 0.1.0
+- 0.2.0
+
+[]
+- entries-poolが杜撰
+ - デフォルトではthread-unsafe
+ - メモリリークの可能性有り
 
 [参照]
 - Bagwell, P. (2001) Ideal Hash Trees. Technical Report, 2001

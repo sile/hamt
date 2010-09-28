@@ -1,15 +1,17 @@
 (in-package :hamt)
 
-;; (declaim (inline alloc-entries free-entries))
-(declaim (notinline alloc-entries free-entries))
+(declaim (inline alloc-entries free-entries))
 
 (defstruct (entries-pool (:constructor make-entries-pool))
   (pool (make-array +BITMAP-SIZE+ :initial-element nil) :type simple-vector)
   (allocate-count 0                                     :type positive-fixnum))
 
+;; ATTENTION!
+;; This special variable is source of thread unsafety.
+;; In multi-threaded programming, per thread must bind their original entries-pool instance to below variable.
 (defvar *entries-pool* (make-entries-pool))
 
-(defun alloc-entries (size entries-pool)
+(defun alloc-entries (size &aux (entries-pool *entries-pool*))
   (declare #.*fastest*
            (entries-pool entries-pool)
            (bitmap-length size))
@@ -23,10 +25,9 @@
           (pop #1#)
       (make-array size))))
 
-(defun free-entries (entries entries-pool)
+(defun free-entries (entries &aux (len (length entries)) (entries-pool *entries-pool*))
   (declare #.*fastest*
            (simple-vector entries)
            (entries-pool entries-pool))
-  (when (plusp (length entries))
-    (push entries (aref (entries-pool-pool entries-pool) 
-                        (1- (length entries))))))
+  (when (plusp len)
+    (push entries (aref (entries-pool-pool entries-pool) (1- len)))))

@@ -12,7 +12,7 @@
 (defun new-arc-stream (key &key hash (start 0) (rehash-count 0))
   (declare (positive-fixnum rehash-count)
            (function hash)
-           #+SBCL (sb-ext:muffle-conditions sb-ext:compiler-note))
+           #.*muffle-warning*)
   (let ((hash-code (funcall hash key rehash-count)))
     (make-arc-stream :hash hash
                      :key key
@@ -20,22 +20,13 @@
                      :start start
                      :rehash-count rehash-count)))
 
+(defun read-n-arc (arc-stream bit-length)
+  (with-slots (hash key hash-code start rehash-count) arc-stream
+    (when (>= start +FIXNUM-LENGTH+)
+      (setf hash-code (funcall hash key (incf rehash-count))
+            start 0))
+    (ldb (byte #1=bit-length (post-incf start #1#)) hash-code)))
+
 (defun read-arc (arc-stream)
   (declare (arc-stream arc-stream))
-  (with-slots (hash key hash-code start rehash-count) arc-stream
-    (when (>= start +FIXNUM-LENGTH+)
-      (setf hash-code (funcall hash key (incf rehash-count))
-            start 0))
-    (prog1 (ldb (byte +PER-ARC-BIT-LENGTH+ start) hash-code)
-      (incf start +PER-ARC-BIT-LENGTH+))))
-
-(defun read-n-arc (arc-stream bit-length)
-  (declare (arc-stream arc-stream)
-           (bitmap-length bit-length)
-           #+SBCL (sb-ext:muffle-conditions sb-ext:compiler-note))
-  (with-slots (hash key hash-code start rehash-count) arc-stream
-    (when (>= start +FIXNUM-LENGTH+)
-      (setf hash-code (funcall hash key (incf rehash-count))
-            start 0))
-    (prog1 (ldb (byte bit-length start) hash-code)
-      (incf start bit-length))))
+  (read-n-arc arc-stream +PER-ARC-BIT-LENGTH+))

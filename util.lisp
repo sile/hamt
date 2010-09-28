@@ -10,8 +10,13 @@
                ,instance
      ,@body))
 
+(defmacro post-incf (n &optional (delta 1))
+  `(prog1 ,n (incf ,n ,delta)))
+
 (defun hash (key rehash-count)
-  (declare #.*fastest* (positive-fixnum rehash-count))
+  "Default hash function for arc-stream"
+  (declare #.*fastest* (positive-fixnum rehash-count)
+           #.*muffle-warning*)
   (if (zerop rehash-count)
       (sxhash key)
     (sxhash (format nil "~D~A" rehash-count key))))

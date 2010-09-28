@@ -33,11 +33,7 @@
 
 (defun get (key hamt)
   (declare #.*interface* (hamt hamt))
-  (let ((root-entries (hamt-root-entries hamt))
-        (new-root-entries (hamt-new-root-entries hamt))
-        (root-bitlen  (hamt-root-bitlen hamt))
-        (resize-threshold (hamt-resize-threshold hamt))
-        (hash         (hamt-hash hamt)))
+  (with-slots (root-entries hash root-bitlen new-root-entries resize-threshold test) hamt
     (declare #.*fastest*)
     (let ((in (new-arc-stream key :hash hash)))
       (declare (dynamic-extent in))
@@ -51,7 +47,7 @@
           (null     (return (values nil nil)))
           (amt-node (setf node entry))        
           (key/value     
-           (return (if (funcall (hamt-test hamt) key (k/v-key entry))  
+           (return (if (funcall test key (k/v-key entry))  
                        (values (k/v-value entry) t)
                      (values nil nil)))))))))
 
@@ -94,7 +90,7 @@
                                WHEN sub-e
                            DO
                            (setf (aref new-root-entries (+ (the positive-fixnum (ash arc root-bitlen)) base)) sub-e))
-                         (free-entries (amt-node-entries e) *entries-pool*))
+                         (free-entries (amt-node-entries e)))
 
                (key/value (let ((in (new-arc-stream (k/v-key e) :hash hash)))
                             (declare (dynamic-extent in))

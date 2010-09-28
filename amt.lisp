@@ -7,11 +7,9 @@
            (bitmap-length start end))
   (logcount (ldb (byte (- end start) start) bitmap)))
 
-(defparameter *empty-entries* #()) ; XXX:
-
 (defstruct amt-node
-  (bitmap  0   :type bitmap)
-  (entries *empty-entries* :type simple-vector))
+  (bitmap  0              :type bitmap)
+  (entries +EMPTY-VECTOR+ :type simple-vector))
 
 (defun valid-entry-p (node arc)
   (declare (amt-node node)
@@ -33,12 +31,10 @@
   (with-slots (bitmap entries) node
     (let ((new-entry-index (ctpop bitmap :end arc)))
       (unless (valid-entry-p node arc)
-        (let ((new-entries (alloc-entries (1+ (length entries)) *entries-pool*)))
-          (declare (simple-vector new-entries))
+        (let ((new-entries (alloc-entries (1+ (length entries)))))
           (setf (ldb (byte 1 arc) bitmap) 1)
           (replace new-entries entries :end1 new-entry-index :end2 new-entry-index)
           (replace new-entries entries :start1 (1+ new-entry-index) :start2 new-entry-index)
-          (free-entries entries *entries-pool*)
+          (free-entries entries)
           (setf entries new-entries)))
       (setf (aref entries new-entry-index) new-entry))))
-
