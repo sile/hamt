@@ -1,11 +1,69 @@
 [version]
 - 0.2.0
 
-[]
-- entries-poolが杜撰
- - デフォルトではthread-unsafe
- - メモリリークの可能性有り
+
+[概要]
+- HAMT(Hash Array Mapped Trie)実装
+　-- HAMT:
+　　--- Bagwell, P. (2001) Ideal Hash Trees. Technical Report, 2001
+　　--- http://lampwww.epfl.ch/papers/idealhashtrees.pdf
+- ハッシュマップの一種
+
+
+[インストール]
+> (require :asdf)
+> (require :asdf-install)
+> (asdf-install:install "hamt-0.2.0.tar.gz")
+
+
+[API]
+= Package# hamt
+
+= Function# make (&key test hash size)
+　- hamtインスタンスを作成する
+　- test: キーの等値比較関数
+　- hash: キーに適用するハッシュ関数
+　- size: 想定されるキー数
+
+= Function# get (key hamt)
+　- キーにマッピングされた値を取得する
+　- key: 検索キー
+　- hamt: hamtインスタンス
+　- 返り値: (values (or キーに対応する値 nil) 左記の値が存在したかどうか)
+
+= Function# entry-count (hamt)
+　- マップに格納されている要素の数を返す
+
+= Function# default-hash (key rehash-count)
+　- デフォルトで使用されるハッシュ関数
+　- key: ハッシュ値の算出元となるキー
+　- rehash-count: ハッシュ値が計算された数 ※1
+※1: キーが同一の場合でもリハッシュ毎に異なるハッシュ値が算出される必要がある
+
+= Function# simple-string-hash (key rehash-count)
+　- simple-string型に対するハッシュ関数
+
+= Function# make-entries-pool ()
+　- HAMTのエントリ用のプールを管理するインスタンスを作成する
+
+= Variable# *entries-pool*
+　- HAMTのエントリ用のプールを管理するインスタンス
+
+
+[注意点]
+- 独自作成のメモリアロケーターに難有り
+　-- entries-allocator.lisp
+　-- デフォルトではスレッドアンセーフ
+　　--- スレッドごとにhamt:*entries-pool*に固有の値(hamt:make-entries-pool)をバインドする必要がある
+　-- メモリリークの可能性がある
+　　--- hamt:*entries-pool*には既に削除された要素への参照がある程度残ってしまっているため
+　　--- 現在のバージョンでは削除処理は未実装なためあまり関係ない
+
+
+[TODO]
+- 削除関数/マップ関数の作成
+
 
 [参照]
-- Bagwell, P. (2001) Ideal Hash Trees. Technical Report, 2001
-　-- http://lampwww.epfl.ch/papers/idealhashtrees.pdf
+- http://d.hatena.ne.jp/sile/20100926/1285467529
+- http://d.hatena.ne.jp/sile/20100929/

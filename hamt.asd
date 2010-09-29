@@ -2,9 +2,9 @@
 
 (defsystem hamt
   :name    "hamt"
-  :version "0.1.0"
+  :version "0.2.0"
   :author  "Takeru Ohta"
-  :description "A implementation of Hash Array Mapped Trie"
+  :description "An implementation of Hash Array Mapped Trie"
   
   :serial t
   :components ((:file "package")
