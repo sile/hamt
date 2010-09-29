@@ -11,16 +11,17 @@
   (resize-border 0                 :type positive-fixnum)
   (entry-count 0                   :type positive-fixnum))
 
-(defun make (&key (test #'equal) (hash #'hash) (size 16))
+(defun make (&key (test #'equal) (hash #'default-hash) (size 8))
   (declare #.*interface*
            #.*muffle-warning*
            (function test hash)
            (positive-fixnum size))
   (let* ((bit-length (ceiling (log size 2)))
-         (init-size  (ash 2 (1- bit-length))))
+         (init-size  (fixash 2 (1- bit-length))))
+    (declare (fixnum-length bit-length))
     (make-hamt :root-entries (make-array init-size :initial-element nil)
                :root-bitlen bit-length
-               :resize-border (ash init-size +PER-ARC-BIT-LENGTH+)
+               :resize-border (fixash init-size +PER-ARC-BIT-LENGTH+)
                :test test :hash hash)))
 
 (defun entry-count (hamt)

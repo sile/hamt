@@ -27,3 +27,18 @@
   (if (zerop rehash-count)
       (sxhash key)
     (sxhash (format nil "~D~A" rehash-count key))))
+
+(setf (symbol-function 'default-hash) #'hash)
+
+(defun simple-string-hash (key rehash-count)
+  (declare #.*fastest* 
+           (positive-fixnum rehash-count)
+           (simple-string key))
+  (loop WITH code OF-TYPE fixnum = 7
+        WITH b = 27183
+        FOR a OF-TYPE fixnum = (+ 31415 rehash-count) THEN (* a b)
+        FOR ch ACROSS key
+    DO (setf code (+ (the fixnum (* code a)) (char-code ch)))
+    FINALLY (return code)))        
+        
+        

@@ -2,8 +2,9 @@
   (:use :common-lisp)
   (:shadow :common-lisp get remove map mapc)
   (:export hamt
-           make entry-count get remove
-           map mapc
+           make entry-count get 
+           ;; TODO: remove map mapc
+           default-hash simple-string-hash
            make-entries-pool *entries-pool*))
 (in-package :hamt)
 

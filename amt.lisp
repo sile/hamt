@@ -2,10 +2,10 @@
 
 (declaim (inline ctpop valid-entry-p get-entry make-amt-node make-key/value))
 
-(defun ctpop (bitmap &key (start 0) (end +BITMAP-SIZE+))
+(defun ctpop (bitmap &key (end +BITMAP-SIZE+))
   (declare (bitmap bitmap)
-           (bitmap-length start end))
-  (logcount (ldb (byte (- end start) start) bitmap)))
+           (bitmap-length end))
+  (logcount (ldb (byte end 0) bitmap)))
 
 (defstruct (key/value (:conc-name k/v-)
                       (:constructor make-key/value (key value)))
@@ -22,7 +22,8 @@
   (ldb-test (byte 1 arc) (amt-node-bitmap node)))
 
 (defun get-entry (node arc)
-  (declare (amt-node node)
+  (declare #.*fastest*
+           (amt-node node)
            (arc arc))
   (with-slots (bitmap entries) node
     (if (not (valid-entry-p node arc))
